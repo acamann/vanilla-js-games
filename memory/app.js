@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultDisplay.textContent = score
         if (cardsWon.length === cardArray.length / 2) {
             grid.setAttribute('class', 'victory')
-            displayAlert('Victory!', 'match')
+            displayAlert('You found all the matches! Victory!!', 'match')
         }
     }
 

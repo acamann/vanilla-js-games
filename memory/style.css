@@ -16,12 +16,14 @@ h3 { margin: 0.4rem; }
     transform: translate(-50%, -50%);
 }
 #alert.match {
-    background-color: lightseagreen;
-    color: darkgreen;
+    background-color: #5cb85c;
+    color: white;
+    border: solid 3px white;
 }
 #alert.no-match {
-    background-color: lightcoral;
-    color: darkred;
+    background-color: #f0ad4e;
+    border: solid 3px white;
+    color: white;
 }
 
 #grid {
