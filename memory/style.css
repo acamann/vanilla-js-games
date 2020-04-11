@@ -1,0 +1,58 @@
+html, body { margin: 0; padding: 0; font-family: 'Baloo Tamma 2', cursive; }
+
+body { margin: 0.5rem; }
+h1 { margin: 0.4rem; }
+h3 { margin: 0.4rem; }
+
+#alert {
+    padding: 10px;
+    text-align: center;
+    border-radius: 10px;
+    font-weight: normal;
+    position: absolute;   
+    left: 50%;
+    top: 50%;
+    opacity: 0.9;
+    transform: translate(-50%, -50%);
+}
+#alert.match {
+    background-color: lightseagreen;
+    color: darkgreen;
+}
+#alert.no-match {
+    background-color: lightcoral;
+    color: darkred;
+}
+
+#grid {
+    position:relative;
+    margin: 0.4rem;
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 900px;
+    border:solid 1px lightgray;
+    padding: 0.2rem;
+}
+
+#grid .card {
+    width: 19%;
+    padding-top: 19%;
+    height: 0px;
+    margin: 0.5%;
+    -webkit-background-size: contain;
+    -moz-background-size: contain;
+    -o-background-size: contain;
+    background-size: contain;
+}
+
+.not-flipped {
+    background: url('images/card-back.png') no-repeat center;
+}
+
+.matched {
+    background-image: none;
+}
+
+#grid.victory {
+    background: url('images/victory.jpg') no-repeat center;
+}
