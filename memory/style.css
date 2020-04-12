@@ -5,7 +5,7 @@ h1 { margin: 0.4rem; }
 h3 { margin: 0.4rem; }
 
 #alert {
-    padding: 10px;
+    padding: 4px 12px;
     text-align: center;
     border-radius: 10px;
     font-weight: normal;
@@ -41,9 +41,6 @@ h3 { margin: 0.4rem; }
     padding-top: 19%;
     height: 0px;
     margin: 0.5%;
-    -webkit-background-size: contain;
-    -moz-background-size: contain;
-    -o-background-size: contain;
     background-size: contain;
 }
 
@@ -59,3 +56,9 @@ h3 { margin: 0.4rem; }
     background: url('images/victory.jpg') no-repeat center;
     background-size: cover;
 }
+
+@media (orientation: portrait) {
+    #grid .card {
+        width: 24%;
+        padding-top: 24%;
+    }
