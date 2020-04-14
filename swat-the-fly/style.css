@@ -1,0 +1,23 @@
+.square {
+    width: 200px;
+    height: 200px;
+    background-size: cover;
+    border: solid 1px gray;
+}
+
+.grid {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: center;
+    align-content: center;
+    width: 618px;
+    height: 618px;
+}
+
+.fly {
+    background-image: url('fly.jpg');
+}
+
+.swat {
+    background-image: url('swat.jpg');
+}
