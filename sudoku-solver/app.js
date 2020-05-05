@@ -118,8 +118,8 @@ function placeSudokuOnGrid(domID, rowArray) {
 //#region Generate New Puzzle
 
 function generatePuzzle() {
-    const INITIAL_SPACES = 40
-    const FINAL_SPACES = 45
+    const INITIAL_CELLS_TO_ERASE = 40
+    const FINAL_CELLS_TO_ERASE = 55
     
     console.time('Generate Random Puzzle Solution');
     solvePuzzleUsingBacktracking(solution, getIndicesOfEmptyCells(solution)); // generate random puzzle solution state from empty grid
@@ -132,39 +132,44 @@ function generatePuzzle() {
     console.time('Find Puzzle with Unique Solution and sufficient complexity');
     while (solutions != 1) {
         puzzle = solution.map(row => row.slice());
-        let erasedCells = [];
+        erasedCells = [];
     
         // remove values at random
-        for (let i = 0; i < INITIAL_SPACES;) {
+        for (let i = 0; i < INITIAL_CELLS_TO_ERASE;) {
             let erasedCell = eraseRandomCell(puzzle);
             if (erasedCell) {
                 erasedCells.push(erasedCell);
                 i++;
             }
-        }
-
-        // TODO: if unique:
-        // TODO: -- remove given... if not unique, reinsert
-        // TODO: -- if unique still, check difficulty
-        // TODO: ---- not difficult enough? remove another given
-
-        //while (solutions < 2 && erasedCells.length < FINAL_SPACES) {
-            //let erasedCell = eraseRandomCell(puzzle);
-            //console.log(`${erasedCell} and list = ${erasedCells.toString()}`);
-            //if (erasedCell) {
-                //erasedCells.push(erasedCell);             
-                puzzleToCheck = puzzle.map(row => row.slice());
-                solutions = checkForUniqueSolutions(puzzleToCheck, getIndicesOfEmptyCells(puzzleToCheck));
-                //if (solutions > 1) {
-                //    let row = erasedCell[0];
-                //    let col = erasedCell[1];
-                //    puzzle[row][col] = solution[row][col];
-                //    erasedCells.pop();
-                //}
-            //}  
-            //console.log(`${solutions} solutions for ${puzzle.toString()}`);
-        //}
+        }        
+        let puzzleToCheck = puzzle.map(row => row.slice());
+        solutions = checkForUniqueSolutions(puzzleToCheck, getIndicesOfEmptyCells(puzzleToCheck));
     }
+
+    let attemptedCells = erasedCells.map(cell => cell.slice());
+    while (erasedCells.length < FINAL_CELLS_TO_ERASE) { // TODO: make this check for difficulty instead of number of removed cells
+        let erasedCell = eraseRandomCell(puzzle);
+        //console.log(`${erasedCell} and list = ${erasedCells.toString()}`);
+        if (erasedCell) {
+            attemptedCells.push(erasedCell);
+            erasedCells.push(erasedCell);             
+            let puzzleToCheck = puzzle.map(row => row.slice());
+            solutions = checkForUniqueSolutions(puzzleToCheck, getIndicesOfEmptyCells(puzzleToCheck));
+            if (solutions > 1) {
+                let row = erasedCell[0];
+                let col = erasedCell[1];
+                puzzle[row][col] = solution[row][col];
+                erasedCells.pop();
+            }
+        }
+        if (attemptedCells.length > 80) {
+            console.log(`${attemptedCells.length}: ${attemptedCells.toString()}`);
+            console.log('Attempted all givens!'); 
+            break;  
+        }
+        //console.log(`${solutions} solutions for ${puzzle.toString()}`);
+    }
+
     console.timeEnd('Find Puzzle with Unique Solution and sufficient complexity');
 }
 
