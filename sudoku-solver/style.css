@@ -23,6 +23,10 @@ main {
 .sudoku .col-2, .sudoku .col-5 {
     border-right: solid 1px black;
 }
+.sudoku .highlight {
+    background-color:lightyellow;
+}
+
 #sudoku-string {
     display:block;
 }
