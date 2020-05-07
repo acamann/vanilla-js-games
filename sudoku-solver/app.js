@@ -421,6 +421,8 @@ function findHumanSolutionStep(sudoku, emptyCells) {
     if (humanSolutionStep = findOnlyChoiceRule(sudoku)) {
         difficulty += 100;
     } else if (humanSolutionStep = findSinglePossibilityRule(sudoku, emptyCells)) {
+        difficulty += 150;
+    } else if (humanSolutionStep = findTwoOutOfThreeRule(sudoku)) {
         difficulty += 200;
     }
     return humanSolutionStep;
@@ -529,6 +531,90 @@ function otherValuesInBlock(sudoku, row, col) {
 }
 
 // 4: TWO OUT OF THREE RULE
+// -- look at three rows at a time, check for certain number.  in two rows?  check final block & column
+function findTwoOutOfThreeRule(sudoku) {
+    for (let topRow = 0; topRow < 9; topRow += 3) {
+        for (let value = 1; value < 10; value++) {
+            let indexesOfValueInBlockRows = [];
+            indexesOfValueInBlockRows.push(sudoku[topRow].indexOf(value));
+            indexesOfValueInBlockRows.push(sudoku[topRow+1].indexOf(value));
+            indexesOfValueInBlockRows.push(sudoku[topRow+2].indexOf(value));
+            if (indexesOfValueInBlockRows.filter(index => index == -1).length == 1) {
+                // identify single row that is missing the value
+                let relativeRowOfMissingValueWithinBlock = indexesOfValueInBlockRows.indexOf(-1);
+                let row = topRow + relativeRowOfMissingValueWithinBlock;
+                
+                // find left most column of the block that is missing this value
+                let leftColOfBlock = new Set([0, 3, 6]);
+                indexesOfValueInBlockRows.map(index => leftColOfBlock.delete(Math.floor(index / 3) * 3));
+                let leftColIndex = leftColOfBlock.values().next().value;
+                
+                // from the three cells within that block & row: identify the empty squares
+                let columnIndexesMissingValue = new Set();
+                for (let colToCheck = leftColIndex; colToCheck < leftColIndex + BLOCK_SIZE; colToCheck++) {
+                    //console.log(`Row=${row}, Col=${col}, Value=${sudoku[row][col]}`);
+                    if (sudoku[row][colToCheck] == 0) {
+                        columnIndexesMissingValue.add(colToCheck);
+                    }
+                }
+
+                 // remove possible cells from the list by checking the column to see if that value already exists 
+                for (let col in columnIndexesMissingValue) {
+                    if (!checkColumn(sudoku, col, value)) {
+                        columnIndexesMissingValue.delete(col);
+                    }
+                }
+
+                // if there is only one cell left, we found a Two out of Three Rule!
+                if (columnIndexesMissingValue.size == 1) {
+                    let col = columnIndexesMissingValue.values().next().value;
+                    return [row, col, value, `According to the Two Out Of Three Rule, the value in (${row+1}, ${col+1}) must be ${value} because because the value shows up in the other two columns within this band and there is only one remaining possibility within this block`];
+                }                
+            }
+        }
+    }
+    for (let leftCol = 0; leftCol < 9; leftCol += 3) {
+        for (let value = 1; value < 10; value++) {
+            let indexesOfValueInBlockCols = [];            
+            indexesOfValueInBlockCols.push(getColumnArray(sudoku, leftCol).indexOf(value));
+            indexesOfValueInBlockCols.push(getColumnArray(sudoku, leftCol+1).indexOf(value));
+            indexesOfValueInBlockCols.push(getColumnArray(sudoku, leftCol+2).indexOf(value));
+            if (indexesOfValueInBlockCols.filter(index => index == -1).length == 1) {
+                // identify single col that is missing the value
+                let relativeColOfMissingValueWithinBlock = indexesOfValueInBlockCols.indexOf(-1);
+                let col = leftCol + relativeColOfMissingValueWithinBlock;
+                
+                // find top most row of the block that is missing this value
+                let topRowOfBlock = new Set([0, 3, 6]);
+                indexesOfValueInBlockCols.map(index => topRowOfBlock.delete(Math.floor(index / 3) * 3));
+                let topRowIndex = topRowOfBlock.values().next().value;
+                
+                // from the three cells within that block & col: identify the empty squares
+                let rowIndexesMissingValue = new Set();
+                for (let rowToCheck = topRowIndex; rowToCheck < topRowIndex + BLOCK_SIZE; rowToCheck++) {
+                    //console.log(`Row=${row}, Col=${col}, Value=${sudoku[row][col]}`);
+                    if (sudoku[rowToCheck][col] == 0) {
+                        rowIndexesMissingValue.add(rowToCheck);
+                    }
+                }
+
+                 // remove possible cells from the list by checking the row to see if that value already exists 
+                for (let row in rowIndexesMissingValue) {
+                    if (!checkRow(sudoku, row, value)) {
+                        rowIndexesMissingValue.delete(row);
+                    }
+                }
+
+                // if there is only one cell left, we found a Two out of Three Rule!
+                if (rowIndexesMissingValue.size == 1) {
+                    let row = rowIndexesMissingValue.values().next().value;
+                    return [row, col, value, `According to the Two Out Of Three Rule, the value in (${row+1}, ${col+1}) must be ${value} because the value shows up in the other two columns within this stack and there is only one remaining possibility within this block`];
+                }                
+            }
+        }
+    }
+    return false;
+}
 
 // 5: SHARED SUBGROUP RULE
 
