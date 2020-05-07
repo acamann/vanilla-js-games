@@ -11,6 +11,7 @@
 
 //#region Global Constants & Variables
 
+var difficulty = 0;
 const BLOCK_SIZE = 3;
 var solution = [
     [0,0,0,0,0,0,0,0,0],
@@ -104,7 +105,7 @@ async function init() {
     placeSudokuOnGrid('solution', solution);
 
     console.time('Solve Puzzle Using Human Approaches');
-    solvePuzzleUsingHumanApproaches(solvingProcess);
+    solvePuzzleUsingHumanSteps(solvingProcess);
     console.timeEnd('Solve Puzzle Using Human Approaches');
 }
 
@@ -146,8 +147,8 @@ function placeSudokuOnGrid(domID, rowArray) {
 //#region Generate New Puzzle
 
 function generatePuzzle() {
-    const INITIAL_CELLS_TO_ERASE = 20
-    const FINAL_CELLS_TO_ERASE = 25
+    const INITIAL_CELLS_TO_ERASE = 40;
+    const FINAL_CELLS_TO_ERASE = 55;
     
     console.time('Generate Random Puzzle Solution');
     solvePuzzleUsingBacktracking(solution, getIndicesOfEmptyCells(solution)); // generate random puzzle solution state from empty grid
@@ -397,17 +398,32 @@ function checkValue(sudoku, row, col, value) {
 //#region Human Solving Approaches
 
 // TODO: make an array of all remaining possibilities in each cell as a set of possible values
-function solvePuzzleUsingHumanApproaches(sudoku) {
-    while (humanSolutionResult = findOnlyChoiceRule(sudoku)) {
-        let row = humanSolutionResult[0];
-        let col = humanSolutionResult[1];
-        let value = humanSolutionResult[2];
-        let explanation = humanSolutionResult[3];
+function solvePuzzleUsingHumanSteps(sudoku) {
+    let emptyCells = getIndicesOfEmptyCells(sudoku);
+    while (humanSolutionStep = findHumanSolutionStep(sudoku, emptyCells)) {
+        let row = humanSolutionStep[0];
+        let col = humanSolutionStep[1];
+        let value = humanSolutionStep[2];
+        let explanation = humanSolutionStep[3];
         highlightCell('solving-process', row, col, value);   //TODO: this is too coupled to the view
         document.querySelector('#sudoku-string').innerHTML += `${explanation}<br />`;
         sudoku[row][col] = value;
+        emptyCells = emptyCells.filter(cell => !(cell[0]==row && cell[1]==col));
     } 
-    document.querySelector('#sudoku-string').innerHTML += 'No more squares can be solved using the Only Choice rule';
+    document.querySelector('#sudoku-string').innerHTML += 'No more squares can be solved using available human rules.<br />';
+    if (emptyCells.length == 0) {
+        document.querySelector('#sudoku-string').innerHTML += `Puzzle Solved!  Difficulty Rating: ${difficulty}`;
+    }
+}
+
+function findHumanSolutionStep(sudoku, emptyCells) {
+    let humanSolutionStep = false;
+    if (humanSolutionStep = findOnlyChoiceRule(sudoku)) {
+        difficulty += 100;
+    } else if (humanSolutionStep = findSinglePossibilityRule(sudoku, emptyCells)) {
+        difficulty += 200;
+    }
+    return humanSolutionStep;
 }
 
 // 1: ONLY CHOICE RULE (Single Candidate, cost: 100, 100)
@@ -479,6 +495,38 @@ function checkBlockForOnlyChoiceRule(sudoku, upperLeftCellIndex) {
 // 2: ONLY SQUARE RULE (Single Position, cost 100, 100)
 
 // 3: SINGLE POSSIBILITY RULE (Single Candidate. cost 100, 100)
+// -- Look at single square, check row, col, and square for all possible
+function findSinglePossibilityRule(sudoku, emptyCells) {
+    for (let emptyCellIndex = 0; emptyCellIndex < emptyCells.length; emptyCellIndex++) {
+        let row = emptyCells[emptyCellIndex][0];
+        let col = emptyCells[emptyCellIndex][1];
+        let eliminatedValues = new Set();
+        otherValuesInRow(sudoku, row, col).forEach(value => eliminatedValues.add(value));
+        otherValuesInColumn(sudoku, row, col).forEach(value => eliminatedValues.add(value));
+        otherValuesInBlock(sudoku, row, col).forEach(value => eliminatedValues.add(value));
+        if (eliminatedValues.size == 8) {
+            for (value = 1; value < 10; value++) {
+                if (!eliminatedValues.has(value)) {
+                    return [row, col, value, `According to the Single Possibility Rule, the value in (${row+1}, ${col+1}) must be ${value} because all other values are eliminated within the row, column, and block.`];
+                }
+            }
+        }
+    }
+}
+
+function otherValuesInRow(sudoku, row, col) {
+    return sudoku[row].filter(square => square !== 0);
+}
+
+function otherValuesInColumn(sudoku, row, col) {
+    return getColumnArray(sudoku, col).filter(square => square !== 0);
+}
+
+function otherValuesInBlock(sudoku, row, col) {
+    let topRow = Math.floor(row / BLOCK_SIZE) * BLOCK_SIZE;
+    let leftColumn = Math.floor(col / BLOCK_SIZE) * BLOCK_SIZE;
+    return getBlockArray(sudoku, [topRow, leftColumn]).filter(square => square !== 0);
+}
 
 // 4: TWO OUT OF THREE RULE
 
