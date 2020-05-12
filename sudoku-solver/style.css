@@ -26,6 +26,10 @@ main {
 .sudoku .highlight {
     background-color:lightyellow;
 }
+.sudoku .pencil-marks {
+    font-size: 0.5em;
+    line-height: auto;
+}
 
 #sudoku-string {
     display:block;
