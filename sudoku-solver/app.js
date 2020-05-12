@@ -154,7 +154,6 @@ function placeSudokuOnGrid(domID, rowArray) {
             if (rowArray[row][col] === 0) {
                 cell.setAttribute('class', `row-${row} col-${col} empty`);
             } else if (Array.isArray(rowArray[row][col])) {
-                console.log(rowArray[row][col]);
                 cell.setAttribute('class', `row-${row} col-${col} pencil-marks`);
                 cell.innerText = rowArray[row][col].join(' ');
             } else {
@@ -476,11 +475,10 @@ function getPencilMarksForEachSquare(sudoku) {
 
 // TODO: where to hold difficulty?
 function findHumanSolutionStep(sudoku, emptyCells) {
-    let humanSolutionStep = false;
-    if (humanSolutionStep = findOnlyChoiceRule(sudoku)) {
-    } else if (humanSolutionStep = findSinglePossibilityRule(sudoku, emptyCells)) {
-    } else if (humanSolutionStep = findTwoOutOfThreeRule(sudoku)) {
-    }
+    let humanSolutionStep = findOnlyChoiceRule(sudoku) ||
+                            findSinglePossibilityRule(sudoku, emptyCells) || 
+                            findTwoOutOfThreeRule(sudoku) ||
+                            false;
     return humanSolutionStep;
 }
 
