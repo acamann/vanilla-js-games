@@ -8,6 +8,19 @@
 // a band is a set of three blocks that are horizontally contiguous
 // a stack is the vertical equivalent.
 
+//#region Sudoku Classes
+class SolutionStep {
+    constructor(stepCode, row, col, value, state, explanation, cost = null) {
+        this.stepCode = stepCode;
+        this.row = row;
+        this.col = col;
+        this.value = value;
+        this.state = state;
+        this.explanation = explanation;
+        this.cost = cost;
+    }
+}
+//#endregion
 
 //#region Global Constants & Variables
 
@@ -115,7 +128,10 @@ async function init() {
     createGridInDOM('pencil-marks');
     createGridInDOM('solution');
 
-    generatePuzzle();
+
+    console.time('Generate Puzzle With Appropriate Difficulty');
+    generatePuzzle(3600, 4500);
+    console.timeEnd('Generate Puzzle With Appropriate Difficulty');
     solvingProcess = puzzle.map(row => row.slice());
 
     placeSudokuOnGrid('puzzle', puzzle);
@@ -165,14 +181,16 @@ function placeSudokuOnGrid(domID, rowArray) {
 }
 
 function displayStepsInDOM(domID, solutionSteps) {
+    document.querySelector(domID).innerHTML += `Initial Empty Squares: ${getIndicesOfEmptyCells(puzzle).length}<br />`;
     for (let step = 0; step < solutionSteps.length; step++) {
         let solutionStep = solutionSteps[step];
-        if (solutionStep[0] == 'uns') {
-            document.querySelector(domID).innerHTML += 'No more solutions can be found using available human steps.';
-        } else if (solutionStep[0] == 'slv') {
-            document.querySelector(domID).innerHTML += `Solution Found! Difficulty: ${solutionStep[1]}`;
-        } else {            
-            document.querySelector(domID).innerHTML += `${solutionStep[4]}<br />`;
+        if (solutionStep.stepCode == 'uns') {
+            document.querySelector(domID).innerHTML += solutionStep.explanation;
+        } else if (solutionStep.stepCode == 'slv') {
+            document.querySelector(domID).innerHTML += `Solution Found! Difficulty: ${solutionStep.cost}`;
+        } else {
+            highlightCell('solving-process', solutionStep.row, solutionStep.col, solutionStep.value);
+            document.querySelector(domID).innerHTML += `${solutionStep.explanation} (${solutionStep.cost})<br />`;
         }
     }
 }
@@ -181,19 +199,16 @@ function displayStepsInDOM(domID, solutionSteps) {
 
 //#region Generate New Puzzle
 
-function generatePuzzle() {
+function generatePuzzle(difficultyMin = 0, difficultyMax = 10000) {
     const INITIAL_CELLS_TO_ERASE = 40;
-    const FINAL_CELLS_TO_ERASE = 55;
     
-    console.time('Generate Random Puzzle Solution');
+    console.time('Generate New Random Puzzle Solution');
     solvePuzzleUsingBacktracking(solution, getIndicesOfEmptyCells(solution)); // generate random puzzle solution state from empty grid
-    console.timeEnd('Generate Random Puzzle Solution');
+    console.timeEnd('Generate New Random Puzzle Solution');
     
-    // apply random transformations to puzzle
     applyRandomTransformations(solution);
     
     let solutions = 0;    
-    console.time('Find Puzzle with Unique Solution and sufficient complexity');
     while (solutions != 1) {
         puzzle = solution.map(row => row.slice());
         erasedCells = [];
@@ -209,12 +224,9 @@ function generatePuzzle() {
         let puzzleToCheck = puzzle.map(row => row.slice());
         solutions = checkForUniqueSolutions(puzzleToCheck, getIndicesOfEmptyCells(puzzleToCheck));
     }
-
     let attemptedCells = erasedCells.map(cell => cell.slice());
-    while (erasedCells.length < FINAL_CELLS_TO_ERASE) { // TODO: make this check for difficulty instead of number of removed cells
-        let erasedCell = eraseRandomCell(puzzle);
-        //console.log(`${erasedCell} and list = ${erasedCells.toString()}`);
-        if (erasedCell) {
+    while (puzzleIsTooEasy(puzzle, difficultyMin)) { 
+        if (erasedCell = eraseRandomCell(puzzle)) {
             attemptedCells.push(erasedCell);
             erasedCells.push(erasedCell);             
             let puzzleToCheck = puzzle.map(row => row.slice());
@@ -224,17 +236,16 @@ function generatePuzzle() {
                 let col = erasedCell[1];
                 puzzle[row][col] = solution[row][col];
                 erasedCells.pop();
+            } else {
+                // successfully erased a cell and got a new potential solution
             }
         }
         if (attemptedCells.length > 80) {
-            console.log(`${attemptedCells.length}: ${attemptedCells.toString()}`);
-            console.log('Attempted all givens!'); 
+            console.log('Attempted to remove all givens, starting over with a new random puzzle');
+            generatePuzzle(difficultyMin, difficultyMax);
             break;  
         }
-        //console.log(`${solutions} solutions for ${puzzle.toString()}`);
     }
-
-    console.timeEnd('Find Puzzle with Unique Solution and sufficient complexity');
 }
 
 function eraseRandomCell(rowArray) {
@@ -244,6 +255,12 @@ function eraseRandomCell(rowArray) {
     if (rowArray[row][col] == 0) return false;
     rowArray[row][col] = 0;
     return [row, col];
+}
+
+function puzzleIsTooEasy(sudoku, difficultyMin) {
+    let solutionSteps = solvePuzzleUsingHumanSteps(sudoku.map(row => row.slice()));
+    let difficultyScore = calculateDifficultyScore(solutionSteps);
+    return (difficultyScore < difficultyMin);
 }
 
 //#endregion
@@ -432,27 +449,21 @@ function checkValue(sudoku, row, col, value) {
 
 //#region Human Solving Approaches
 
-// TODO: make an array of all remaining possibilities in each cell as a set of possible values
 function solvePuzzleUsingHumanSteps(sudoku) {
     let emptyCells = getIndicesOfEmptyCells(sudoku);
     let pencilMarks = getPencilMarksForEachSquare(sudoku);
     placeSudokuOnGrid('pencil-marks', pencilMarks);
     let solutionSteps = [];
-    while (humanSolutionStep = findHumanSolutionStep(sudoku, emptyCells)) {
-        let row = humanSolutionStep[1];
-        let col = humanSolutionStep[2];
-        let value = humanSolutionStep[3];
-        //let explanation = humanSolutionStep[4];
-        highlightCell('solving-process', row, col, value);   //TODO: move this to the calling function, this is too coupled to the view
-        solutionSteps.push(humanSolutionStep);
-        sudoku[row][col] = value;
-        emptyCells = emptyCells.filter(cell => !(cell[0]==row && cell[1]==col));
+    while (solutionStep = findHumanSolutionStep(sudoku, emptyCells)) {
+        solutionSteps.push(solutionStep);
+        sudoku[solutionStep.row][solutionStep.col] = solutionStep.value;
+        emptyCells = emptyCells.filter(cell => !(cell[0]==solutionStep.row && cell[1]==solutionStep.col));
     } 
     if (emptyCells.length == 0) {
         let difficulty = calculateDifficultyScore(solutionSteps);
-        solutionSteps.push(["slv", difficulty]); 
+        solutionSteps.push(new SolutionStep("slv", null, null, null, sudoku, 'Puzzle Solved!', difficulty)); 
     } else {
-        solutionSteps.push(["uns", 'Unsolvable using available human rules.']);
+        solutionSteps.push(new SolutionStep("uns", null, null, null, sudoku, 'Unsolvable using available human rules.'));
     }
     return solutionSteps;
 }
@@ -490,7 +501,7 @@ function findOnlyChoiceRule(sudoku) {
         if (col = checkRowForOnlyChoiceRule(sudoku, row)) {
             for (let value = 1; value < 10; value++) {
                 if (checkRow(sudoku, row, value)) {
-                    return ['ocr', row, col, value, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the row already contains all other possible values.`]
+                    return new SolutionStep('ocr', row, col, value, null, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the row already contains all other possible values.`);
                 }
             }
         }
@@ -499,7 +510,7 @@ function findOnlyChoiceRule(sudoku) {
         if (row = checkColumnForOnlyChoiceRule(sudoku, col)) {
             for (let value = 1; value < 10; value++) {
                 if (checkColumn(sudoku, col, value)) {
-                    return ['ocr', row, col, value, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the column already contains all other possible values.`]
+                    return new SolutionStep('ocr', row, col, value, null, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the column already contains all other possible values.`);
                 }
             }
         }
@@ -511,7 +522,7 @@ function findOnlyChoiceRule(sudoku) {
                 let col = cell[1];
                 for (let value = 1; value < 10; value++) {
                     if (checkBlock(sudoku, row, col, value)) {
-                        return ['ocr', row, col, value, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the block already contains all other possible values.`]
+                        return new SolutionStep('ocr', row, col, value, null, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the block already contains all other possible values.`);
                     }
                 }
             }
@@ -563,7 +574,7 @@ function findSinglePossibilityRule(sudoku, emptyCells) {
         if (eliminatedValues.size == 8) {
             for (value = 1; value < 10; value++) {
                 if (!eliminatedValues.has(value)) {
-                    return ['spr', row, col, value, `According to the Single Possibility Rule, the value in (${row+1}, ${col+1}) must be ${value} because all other values are eliminated within the row, column, and block.`];
+                    return new SolutionStep('spr', row, col, value, null, `According to the Single Possibility Rule, the value in (${row+1}, ${col+1}) must be ${value} because all other values are eliminated within the row, column, and block.`);
                 }
             }
         }
@@ -622,7 +633,7 @@ function findTwoOutOfThreeRule(sudoku) {
                 // if there is only one cell left, we found a Two out of Three Rule!
                 if (columnIndexesMissingValue.size == 1) {
                     let col = columnIndexesMissingValue.values().next().value;
-                    return ['2o3', row, col, value, `According to the Two Out Of Three Rule, the value in (${row+1}, ${col+1}) must be ${value} because because the value shows up in the other two columns within this band and there is only one remaining possibility within this block`];
+                    return new SolutionStep('2o3', row, col, value, null, `According to the Two Out Of Three Rule, the value in (${row+1}, ${col+1}) must be ${value} because because the value shows up in the other two columns within this band and there is only one remaining possibility within this block`);
                 }                
             }
         }
@@ -662,7 +673,7 @@ function findTwoOutOfThreeRule(sudoku) {
                 // if there is only one cell left, we found a Two out of Three Rule!
                 if (rowIndexesMissingValue.size == 1) {
                     let row = rowIndexesMissingValue.values().next().value;
-                    return ['2o3', row, col, value, `According to the Two Out Of Three Rule, the value in (${row+1}, ${col+1}) must be ${value} because the value shows up in the other two columns within this stack and there is only one remaining possibility within this block`];
+                    return new SolutionStep('2o3', row, col, value, null, `According to the Two Out Of Three Rule, the value in (${row+1}, ${col+1}) must be ${value} because the value shows up in the other two columns within this stack and there is only one remaining possibility within this block`);
                 }                
             }
         }
@@ -693,21 +704,24 @@ function calculateDifficultyScore(solutionSteps) {
     let twoOutOfThreeRuleHasBeenUsed = false;
 
     for (let stepIndex = 0; stepIndex < solutionSteps.length; stepIndex++) {
-        switch (stepCode = solutionSteps[stepIndex][0]) {
+        let stepScore = 0;
+        switch (solutionSteps[stepIndex].stepCode) {
             case 'ocr':
-                difficultyScore += onlyChoiceRuleHasBeenUsed ? ONLY_CHOICE_INITIAL_COST : ONLY_CHOICE_RECURRING_COST;
+                stepScore = onlyChoiceRuleHasBeenUsed ? ONLY_CHOICE_INITIAL_COST : ONLY_CHOICE_RECURRING_COST;
                 onlyChoiceRuleHasBeenUsed = true;
                 break;
             case 'spr':
-                difficultyScore += singlePossibilityRuleHasBeenUsed ? SINGLE_POSSIBILITY_INITIAL_COST : SINGLE_POSSIBILITY_RECURRING_COST
+                stepScore = singlePossibilityRuleHasBeenUsed ? SINGLE_POSSIBILITY_INITIAL_COST : SINGLE_POSSIBILITY_RECURRING_COST
                 singlePossibilityRuleHasBeenUsed = true;
                 break;
-            case '203':
-                difficultyScore += twoOutOfThreeRuleHasBeenUsed ? TWO_OUT_OF_THREE_INITIAL_COST : TWO_OUT_OF_THREE_RECURRING_COST;
+            case '2o3':
+                stepScore = twoOutOfThreeRuleHasBeenUsed ? TWO_OUT_OF_THREE_INITIAL_COST : TWO_OUT_OF_THREE_RECURRING_COST;
                 twoOutOfThreeRuleHasBeenUsed = true;
                 break;
-        }     
-    }
+        }
+        difficultyScore += stepScore;
+        solutionSteps[stepIndex].cost = stepScore;  
+    }    
     return difficultyScore;
 }
 
