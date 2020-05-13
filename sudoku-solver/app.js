@@ -25,12 +25,16 @@ class SolutionStep {
 //#region Global Constants & Variables
 
 // Technique Costs to calculate Difficulty
-const ONLY_CHOICE_INITIAL_COST = 100;
-const ONLY_CHOICE_RECURRING_COST = 90;
-const SINGLE_POSSIBILITY_INITIAL_COST = 100;
-const SINGLE_POSSIBILITY_RECURRING_COST = 90;
-const TWO_OUT_OF_THREE_INITIAL_COST = 350;
-const TWO_OUT_OF_THREE_RECURRING_COST = 200;
+const TECHNIQUE_COST = {
+    ONLY_CHOICE: { INITIAL: 100, RECURRING: 100 },
+    SINGLE_POSSIBILITY: { INITIAL: 100, RECURRING: 100 },
+    TWO_OUT_OF_THREE: { INITIAL: 250, RECURRING: 150 },
+    CANDIDATE_LINES: { INITIAL: 350, RECURRING: 200 },
+    DOUBLE_PAIRS: { INITIAL: 500, RECURRING: 250 },
+    MULTIPLE_LINES: { INITIAL: 700, RECURRING: 500 },
+    NAKED_PAIR: { INITIAL: 750, RECURRING: 500 },
+    HIDDEN_PAIR: { INITIAL: 1500, RECURRING: 1200 }
+}
 
 // Puzzle Difficulty Ranges
 const DIFFICULTY_RANGE = {
@@ -141,7 +145,7 @@ async function init() {
 
 
     console.time('Generate Puzzle With Appropriate Difficulty');
-    generatePuzzle(DIFFICULTY_RANGE.MEDIUM);
+    generatePuzzle(DIFFICULTY_RANGE.EASY);
     console.timeEnd('Generate Puzzle With Appropriate Difficulty');
     solvingProcess = puzzle.map(row => row.slice());
 
@@ -508,7 +512,7 @@ function findHumanSolutionStep(sudoku, emptyCells) {
     return humanSolutionStep;
 }
 
-// 1: ONLY CHOICE RULE (Single Candidate, cost: 100, 100)
+// 1: ONLY CHOICE RULE (cost: 100, 100)
 
 // returns [row, col, value, explanation] or false if the Only Choice Rule cannot be applied anywhere
 function findOnlyChoiceRule(sudoku) {
@@ -573,8 +577,6 @@ function checkBlockForOnlyChoiceRule(sudoku, upperLeftCellIndex) {
     }
     return false;
 }
-
-// 2: ONLY SQUARE RULE (Single Position, cost 100, 100)
 
 // 3: SINGLE POSSIBILITY RULE (Single Candidate. cost 100, 100)
 // -- Look at single square, check row, col, and square for all possible
@@ -722,15 +724,21 @@ function calculateDifficultyScore(solutionSteps) {
         let stepScore = 0;
         switch (solutionSteps[stepIndex].stepCode) {
             case 'ocr':
-                stepScore = onlyChoiceRuleHasBeenUsed ? ONLY_CHOICE_INITIAL_COST : ONLY_CHOICE_RECURRING_COST;
+                stepScore = onlyChoiceRuleHasBeenUsed ? 
+                            TECHNIQUE_COST.ONLY_CHOICE.RECURRING : 
+                            TECHNIQUE_COST.ONLY_CHOICE.INITIAL;
                 onlyChoiceRuleHasBeenUsed = true;
                 break;
             case 'spr':
-                stepScore = singlePossibilityRuleHasBeenUsed ? SINGLE_POSSIBILITY_INITIAL_COST : SINGLE_POSSIBILITY_RECURRING_COST
+                stepScore = singlePossibilityRuleHasBeenUsed ? 
+                            TECHNIQUE_COST.SINGLE_POSSIBILITY.RECURRING :
+                            TECHNIQUE_COST.SINGLE_POSSIBILITY.INITIAL;
                 singlePossibilityRuleHasBeenUsed = true;
                 break;
             case '2o3':
-                stepScore = twoOutOfThreeRuleHasBeenUsed ? TWO_OUT_OF_THREE_INITIAL_COST : TWO_OUT_OF_THREE_RECURRING_COST;
+                stepScore = twoOutOfThreeRuleHasBeenUsed ? 
+                            TECHNIQUE_COST.TWO_OUT_OF_THREE.RECURRING :
+                            TECHNIQUE_COST.TWO_OUT_OF_THREE.INITIAL;
                 twoOutOfThreeRuleHasBeenUsed = true;
                 break;
         }
