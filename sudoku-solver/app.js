@@ -24,12 +24,23 @@ class SolutionStep {
 
 //#region Global Constants & Variables
 
+// Technique Costs to calculate Difficulty
 const ONLY_CHOICE_INITIAL_COST = 100;
-const ONLY_CHOICE_RECURRING_COST = 100;
+const ONLY_CHOICE_RECURRING_COST = 90;
 const SINGLE_POSSIBILITY_INITIAL_COST = 100;
-const SINGLE_POSSIBILITY_RECURRING_COST = 100;
-const TWO_OUT_OF_THREE_INITIAL_COST = 200;
+const SINGLE_POSSIBILITY_RECURRING_COST = 90;
+const TWO_OUT_OF_THREE_INITIAL_COST = 350;
 const TWO_OUT_OF_THREE_RECURRING_COST = 200;
+
+// Puzzle Difficulty Ranges
+const DIFFICULTY_RANGE = {
+    BEGINNER: { MIN: 3600, MAX: 4500 },
+    EASY: { MIN: 4300, MAX: 5500 },
+    MEDIUM: { MIN: 5300, MAX: 6900 },
+    TRICKY: { MIN: 6500, MAX: 9300 },
+    FIENDISH: { MIN: 8300, MAX: 14000 },
+    DIABOLICAL: {MIN: 11000, MAX: 25000}
+}
 
 const BLOCK_SIZE = 3;
 var solution = [
@@ -130,7 +141,7 @@ async function init() {
 
 
     console.time('Generate Puzzle With Appropriate Difficulty');
-    generatePuzzle(3600, 4500);
+    generatePuzzle(DIFFICULTY_RANGE.MEDIUM);
     console.timeEnd('Generate Puzzle With Appropriate Difficulty');
     solvingProcess = puzzle.map(row => row.slice());
 
@@ -199,7 +210,7 @@ function displayStepsInDOM(domID, solutionSteps) {
 
 //#region Generate New Puzzle
 
-function generatePuzzle(difficultyMin = 0, difficultyMax = 10000) {
+function generatePuzzle(difficultyRange) {
     const INITIAL_CELLS_TO_ERASE = 40;
     
     console.time('Generate New Random Puzzle Solution');
@@ -208,42 +219,41 @@ function generatePuzzle(difficultyMin = 0, difficultyMax = 10000) {
     
     applyRandomTransformations(solution);
     
-    let solutions = 0;    
-    while (solutions != 1) {
+    let numberOfSolutions = 0;
+    var erasedCells;
+
+    while (numberOfSolutions != 1) {
         puzzle = solution.map(row => row.slice());
         erasedCells = [];
     
-        // remove values at random
         for (let i = 0; i < INITIAL_CELLS_TO_ERASE;) {
-            let erasedCell = eraseRandomCell(puzzle);
-            if (erasedCell) {
+            if (erasedCell = eraseRandomCell(puzzle)) {
                 erasedCells.push(erasedCell);
                 i++;
             }
         }        
         let puzzleToCheck = puzzle.map(row => row.slice());
-        solutions = checkForUniqueSolutions(puzzleToCheck, getIndicesOfEmptyCells(puzzleToCheck));
-    }
+        numberOfSolutions = checkForUniqueSolutions(puzzleToCheck, getIndicesOfEmptyCells(puzzleToCheck));
+    } // block completes when the initially seeded puzzle has a unique solution
+
     let attemptedCells = erasedCells.map(cell => cell.slice());
-    while (puzzleIsTooEasy(puzzle, difficultyMin)) { 
+    while (puzzleIsTooEasy(puzzle, difficultyRange.MIN)) { 
         if (erasedCell = eraseRandomCell(puzzle)) {
             attemptedCells.push(erasedCell);
             erasedCells.push(erasedCell);             
             let puzzleToCheck = puzzle.map(row => row.slice());
             solutions = checkForUniqueSolutions(puzzleToCheck, getIndicesOfEmptyCells(puzzleToCheck));
-            if (solutions > 1) {
+            if (solutions > 1 || puzzleIsTooHard(puzzle, difficultyRange.MAX)) {
                 let row = erasedCell[0];
                 let col = erasedCell[1];
                 puzzle[row][col] = solution[row][col];
                 erasedCells.pop();
-            } else {
-                // successfully erased a cell and got a new potential solution
-            }
+            } 
         }
         if (attemptedCells.length > 80) {
-            console.log('Attempted to remove all givens, starting over with a new random puzzle');
-            generatePuzzle(difficultyMin, difficultyMax);
-            break;  
+            console.log('Attempted to remove all possible cells without achieving desired difficulty, starting over with a new random puzzle');
+            generatePuzzle(difficultyRange);
+            break;
         }
     }
 }
@@ -251,7 +261,6 @@ function generatePuzzle(difficultyMin = 0, difficultyMax = 10000) {
 function eraseRandomCell(rowArray) {
     let row = Math.floor(Math.random() * 9);
     let col = Math.floor(Math.random() * 9);
-    //let value = rowArray[row][col];
     if (rowArray[row][col] == 0) return false;
     rowArray[row][col] = 0;
     return [row, col];
@@ -261,6 +270,12 @@ function puzzleIsTooEasy(sudoku, difficultyMin) {
     let solutionSteps = solvePuzzleUsingHumanSteps(sudoku.map(row => row.slice()));
     let difficultyScore = calculateDifficultyScore(solutionSteps);
     return (difficultyScore < difficultyMin);
+}
+
+function puzzleIsTooHard(sudoku, difficultyMax) {
+    let solutionSteps = solvePuzzleUsingHumanSteps(sudoku.map(row => row.slice()));
+    let difficultyScore = calculateDifficultyScore(solutionSteps);
+    return (difficultyScore > difficultyMax);
 }
 
 //#endregion
