@@ -15,9 +15,20 @@ class SolutionStep {
         this.row = row;
         this.col = col;
         this.value = value;
-        this.state = state;
+        this.state = Array.isArray(state) ? 
+                        state.map(row => row.join()) :
+                        state;
         this.explanation = explanation;
         this.cost = cost;
+    }
+}
+
+class Sudoku {
+    constructor(puzzle, solution, solutionSteps, difficulty) {
+        this.puzzle = puzzle;
+        this.solution = solution;
+        this.solutionSteps = solutionSteps;
+        this.difficulty = difficulty;
     }
 }
 //#endregion
@@ -27,7 +38,7 @@ class SolutionStep {
 // Technique Costs to calculate Difficulty
 const TECHNIQUE_COST = {
     ONLY_CHOICE: { INITIAL: 100, RECURRING: 100 },
-    SINGLE_POSSIBILITY: { INITIAL: 100, RECURRING: 100 },
+    SINGLE_CANDIDATE: { INITIAL: 100, RECURRING: 100 },
     TWO_OUT_OF_THREE: { INITIAL: 250, RECURRING: 150 },
     CANDIDATE_LINES: { INITIAL: 350, RECURRING: 200 },
     DOUBLE_PAIRS: { INITIAL: 500, RECURRING: 250 },
@@ -94,47 +105,6 @@ var pencilMarks = [
 
 //#endregion
 
-//#region Generate Puzzle using Latin Squares (OLD) 
-
-function generateRandomSolutionUsingLatinSquares() {
-    const latinSquares = [
-        [[0,1,2],[1,2,0],[2,0,1]],
-        [[0,1,2],[2,0,1],[1,2,0]],
-        [[0,2,1],[1,0,2],[2,1,0]],
-        [[0,2,1],[2,1,0],[1,0,2]],
-        [[1,0,2],[0,2,1],[2,1,0]],
-        [[1,0,2],[2,1,0],[0,2,1]],
-        [[1,2,0],[0,1,2],[2,0,1]],
-        [[1,2,0],[2,0,1],[0,1,2]],
-        [[2,1,0],[0,2,1],[1,0,2]],
-        [[2,1,0],[1,0,2],[0,2,1]],
-        [[2,0,1],[0,1,2],[1,2,0]],
-        [[2,0,1],[1,2,0],[0,1,2]]
-    ];
-
-    // select a 3x3 Latin Square & treat it as the first digit of a two-digit base 3 number corresponding with each block
-    const conversionBlock = latinSquares[Math.floor(Math.random() * 12)].map(row => row.map(x => x * 3));
-    
-    // select nine 3x3 Latin Squares, with replacement
-    let blocks = [];
-    for (let blockNumber = 0; blockNumber < 9; blockNumber++) {
-        //convert to base 10 using the value from conversionBlock that corresponds to this block
-        blocks.push(latinSquares[Math.floor(Math.random() * 12)].map(row => row.map(x => x + conversionBlock[Math.floor(blockNumber / 3)][blockNumber % 3] + 1)));
-    }
-    
-    // convert blocks to rows
-    solution = getRowArrayFromBlockArray(blocks);
-
-    // swap rows to remove block duplicates (2nd & 4th, 3rd & 7th, 6th & 8th?)
-    swapRows(solution, 1, 3);
-    swapRows(solution, 2, 6);
-    swapRows(solution, 5, 7);
-
-    applyRandomTransformations(solution);
-}
-
-//#endregion 
-
 //#region Init and Manipulate DOM
 
 async function init() {    
@@ -145,7 +115,7 @@ async function init() {
 
 
     console.time('Generate Puzzle With Appropriate Difficulty');
-    generatePuzzle(DIFFICULTY_RANGE.EASY);
+    generatePuzzle(DIFFICULTY_RANGE.MEDIUM);
     console.timeEnd('Generate Puzzle With Appropriate Difficulty');
     solvingProcess = puzzle.map(row => row.slice());
 
@@ -205,7 +175,7 @@ function displayStepsInDOM(domID, solutionSteps) {
             document.querySelector(domID).innerHTML += `Solution Found! Difficulty: ${solutionStep.cost}`;
         } else {
             highlightCell('solving-process', solutionStep.row, solutionStep.col, solutionStep.value);
-            document.querySelector(domID).innerHTML += `${solutionStep.explanation} (${solutionStep.cost})<br />`;
+            document.querySelector(domID).innerHTML += `${solutionStep.explanation} (${solutionStep.cost})<br />${solutionStep.state}<br />`;
         }
     }
 }
@@ -223,10 +193,8 @@ function generatePuzzle(difficultyRange) {
     
     applyRandomTransformations(solution);
     
-    let numberOfSolutions = 0;
-    var erasedCells;
-
-    while (numberOfSolutions != 1) {
+    let numberOfSolutions = 0;    
+    while ( numberOfSolutions != 1 || !puzzleIsSolvableUsingHumanSteps(puzzle)) {
         puzzle = solution.map(row => row.slice());
         erasedCells = [];
     
@@ -237,28 +205,43 @@ function generatePuzzle(difficultyRange) {
             }
         }        
         let puzzleToCheck = puzzle.map(row => row.slice());
-        numberOfSolutions = checkForUniqueSolutions(puzzleToCheck, getIndicesOfEmptyCells(puzzleToCheck));
+        numberOfSolutions = checkForUniqueSolutions(puzzleToCheck, getIndicesOfEmptyCells(puzzleToCheck));        
     } // block completes when the initially seeded puzzle has a unique solution
 
     let attemptedCells = erasedCells.map(cell => cell.slice());
-    while (puzzleIsTooEasy(puzzle, difficultyRange.MIN)) { 
-        if (erasedCell = eraseRandomCell(puzzle)) {
-            attemptedCells.push(erasedCell);
-            erasedCells.push(erasedCell);             
-            let puzzleToCheck = puzzle.map(row => row.slice());
-            solutions = checkForUniqueSolutions(puzzleToCheck, getIndicesOfEmptyCells(puzzleToCheck));
-            if (solutions > 1 || puzzleIsTooHard(puzzle, difficultyRange.MAX)) {
+    while (puzzleIsOutOfDifficultyRange(puzzle, difficultyRange.MIN, difficultyRange.MAX)) {
+        if (puzzleIsSolvableUsingHumanSteps(puzzle)) {
+            if (puzzleIsTooEasy(puzzle, difficultyRange.MIN)) {
+                if (erasedCell = eraseRandomCell(puzzle)) {
+                    //console.log(`puzzle is too easy: ${puzzle.toString()}`);
+                    attemptedCells.push(erasedCell);
+                    erasedCells.push(erasedCell);             
+                    let puzzleToCheck = puzzle.map(row => row.slice());
+                    solutions = checkForUniqueSolutions(puzzleToCheck, getIndicesOfEmptyCells(puzzleToCheck));
+                    if (solutions > 1) {
+                        let row = erasedCell[0];
+                        let col = erasedCell[1];
+                        puzzle[row][col] = solution[row][col];
+                        erasedCells.pop();
+                    } 
+                }
+                if (attemptedCells.length > 80) {
+                    console.log('Attempted to remove all possible cells without achieving desired difficulty, starting over with a new random puzzle');
+                    generatePuzzle(difficultyRange);
+                    break;
+                }
+            } else if (puzzleIsTooHard(puzzle, difficultyRange.MAX)) {
+                //console.log(`puzzle is too hard: ${puzzle.toString()}`);
+                let erasedCell = erasedCells.pop();
                 let row = erasedCell[0];
                 let col = erasedCell[1];
                 puzzle[row][col] = solution[row][col];
-                erasedCells.pop();
-            } 
-        }
-        if (attemptedCells.length > 80) {
-            console.log('Attempted to remove all possible cells without achieving desired difficulty, starting over with a new random puzzle');
+            }
+        } else {
+            // if puzzle can't be solved using human steps
             generatePuzzle(difficultyRange);
             break;
-        }
+        }            
     }
 }
 
@@ -268,6 +251,15 @@ function eraseRandomCell(rowArray) {
     if (rowArray[row][col] == 0) return false;
     rowArray[row][col] = 0;
     return [row, col];
+}
+
+function puzzleIsSolvableUsingHumanSteps(sudoku) {
+    let solutionSteps = solvePuzzleUsingHumanSteps(sudoku.map(row => row.slice()));
+    return solutionSteps[solutionSteps.length - 1].stepCode == 'slv';
+}
+
+function puzzleIsOutOfDifficultyRange(sudoku, difficultyMin, difficultyMax) {
+    return (puzzleIsTooEasy(sudoku, difficultyMin) || puzzleIsTooHard(sudoku, difficultyMax));
 }
 
 function puzzleIsTooEasy(sudoku, difficultyMin) {
@@ -378,7 +370,6 @@ function solvePuzzleUsingBacktracking(sudoku, emptyCells) {
     var valuesToCheck = shuffle([1,2,3,4,5,6,7,8,9]);
 
     for (let i = 0; i < valuesToCheck.length; i++) {
-        //console.log(`(${row},${col}) valuesToCheck is ${valuesToCheck.toString()}, checking index ${i}: ${valuesToCheck[i]}... ${this.checkValue(sudoku, row, col, valuesToCheck[i])}, emptyCells.length = ${emptyCells.length}, solutionCount = ${solutionCount}`);
         if (this.checkValue(sudoku, row, col, valuesToCheck[i])) {
             sudoku[row][col] = valuesToCheck[i];
             emptyCells.shift();
@@ -471,9 +462,9 @@ function checkValue(sudoku, row, col, value) {
 function solvePuzzleUsingHumanSteps(sudoku) {
     let emptyCells = getIndicesOfEmptyCells(sudoku);
     let pencilMarks = getPencilMarksForEachSquare(sudoku);
-    placeSudokuOnGrid('pencil-marks', pencilMarks);
+    //placeSudokuOnGrid('pencil-marks', pencilMarks);
     let solutionSteps = [];
-    while (solutionStep = findHumanSolutionStep(sudoku, emptyCells)) {
+    while (solutionStep = findHumanSolutionStep(sudoku, pencilMarks, emptyCells)) {
         solutionSteps.push(solutionStep);
         sudoku[solutionStep.row][solutionStep.col] = solutionStep.value;
         emptyCells = emptyCells.filter(cell => !(cell[0]==solutionStep.row && cell[1]==solutionStep.col));
@@ -503,11 +494,11 @@ function getPencilMarksForEachSquare(sudoku) {
     return pencilMarks;
 }
 
-// TODO: where to hold difficulty?
-function findHumanSolutionStep(sudoku, emptyCells) {
+function findHumanSolutionStep(sudoku, pencilMarks, emptyCells) {
     let humanSolutionStep = findOnlyChoiceRule(sudoku) ||
-                            findSinglePossibilityRule(sudoku, emptyCells) || 
+                            findSingleCandidateRule(sudoku, pencilMarks) ||
                             findTwoOutOfThreeRule(sudoku) ||
+                            findNakedTwinRule(sudoku, pencilMarks) ||
                             false;
     return humanSolutionStep;
 }
@@ -520,7 +511,7 @@ function findOnlyChoiceRule(sudoku) {
         if (col = checkRowForOnlyChoiceRule(sudoku, row)) {
             for (let value = 1; value < 10; value++) {
                 if (checkRow(sudoku, row, value)) {
-                    return new SolutionStep('ocr', row, col, value, null, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the row already contains all other possible values.`);
+                    return new SolutionStep('ocr', row, col, value, sudoku, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the row already contains all other possible values.`);
                 }
             }
         }
@@ -529,7 +520,7 @@ function findOnlyChoiceRule(sudoku) {
         if (row = checkColumnForOnlyChoiceRule(sudoku, col)) {
             for (let value = 1; value < 10; value++) {
                 if (checkColumn(sudoku, col, value)) {
-                    return new SolutionStep('ocr', row, col, value, null, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the column already contains all other possible values.`);
+                    return new SolutionStep('ocr', row, col, value, sudoku, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the column already contains all other possible values.`);
                 }
             }
         }
@@ -541,7 +532,7 @@ function findOnlyChoiceRule(sudoku) {
                 let col = cell[1];
                 for (let value = 1; value < 10; value++) {
                     if (checkBlock(sudoku, row, col, value)) {
-                        return new SolutionStep('ocr', row, col, value, null, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the block already contains all other possible values.`);
+                        return new SolutionStep('ocr', row, col, value, sudoku, `According to the Only Choice Rule, the value in (${row+1}, ${col+1}) must be ${value} because the block already contains all other possible values.`);
                     }
                 }
             }
@@ -578,39 +569,43 @@ function checkBlockForOnlyChoiceRule(sudoku, upperLeftCellIndex) {
     return false;
 }
 
-// 3: SINGLE POSSIBILITY RULE (Single Candidate. cost 100, 100)
-// -- Look at single square, check row, col, and square for all possible
-function findSinglePossibilityRule(sudoku, emptyCells) {
-    for (let emptyCellIndex = 0; emptyCellIndex < emptyCells.length; emptyCellIndex++) {
-        let row = emptyCells[emptyCellIndex][0];
-        let col = emptyCells[emptyCellIndex][1];
-        let eliminatedValues = new Set();
-        otherValuesInRow(sudoku, row, col).forEach(value => eliminatedValues.add(value));
-        otherValuesInColumn(sudoku, row, col).forEach(value => eliminatedValues.add(value));
-        otherValuesInBlock(sudoku, row, col).forEach(value => eliminatedValues.add(value));
-        if (eliminatedValues.size == 8) {
-            for (value = 1; value < 10; value++) {
-                if (!eliminatedValues.has(value)) {
-                    return new SolutionStep('spr', row, col, value, null, `According to the Single Possibility Rule, the value in (${row+1}, ${col+1}) must be ${value} because all other values are eliminated within the row, column, and block.`);
-                }
+// 2: SINGLE CANDIDATE (cost 100, 100)
+function findSingleCandidateRule(sudoku, pencilMarks) {
+    for (let row = 0; row < pencilMarks.length; row++) {
+        for (let col = 0; col < pencilMarks[row].length; col++) {
+            // if the square is not solved (is an array), but there is only one possible value
+            if (Array.isArray(pencilMarks[row][col]) && pencilMarks[row][col].length == 1) {
+                let value = pencilMarks[row][col][0];
+                sudoku[row][col] = value;
+                pencilMarks[row][col] = value;
+                return new SolutionStep('scr', row, col, value, sudoku, `According to the Single Candidate Rule, the value in (${row+1}, ${col+1}) must be ${value} because all other possibilities are present within the row, column, and block.`); 
             }
         }
     }
 }
 
-function otherValuesInRow(sudoku, row, col) {
-    return sudoku[row].filter(square => square !== 0);
-}
 
-function otherValuesInColumn(sudoku, row, col) {
-    return getColumnArray(sudoku, col).filter(square => square !== 0);
-}
+// // 3: SINGLE POSSIBILITY RULE (Single Candidate. cost 100, 100)
+// // -- Look at single square, check row, col, and square for all possible
+// function findSinglePossibilityRule(sudoku, emptyCells) {
+//     for (let emptyCellIndex = 0; emptyCellIndex < emptyCells.length; emptyCellIndex++) {
+//         let row = emptyCells[emptyCellIndex][0];
+//         let col = emptyCells[emptyCellIndex][1];
+//         let eliminatedValues = new Set();
+//         otherValuesInRow(sudoku, row, col).forEach(value => eliminatedValues.add(value));
+//         otherValuesInColumn(sudoku, row, col).forEach(value => eliminatedValues.add(value));
+//         otherValuesInBlock(sudoku, row, col).forEach(value => eliminatedValues.add(value));
+//         if (eliminatedValues.size == 8) {
+//             for (value = 1; value < 10; value++) {
+//                 if (!eliminatedValues.has(value)) {
+//                     return new SolutionStep('spr', row, col, value, null, `According to the Single Possibility Rule, the value in (${row+1}, ${col+1}) must be ${value} because all other values are eliminated within the row, column, and block.`);
+//                 }
+//             }
+//         }
+//     }
+// }
 
-function otherValuesInBlock(sudoku, row, col) {
-    let topRow = Math.floor(row / BLOCK_SIZE) * BLOCK_SIZE;
-    let leftColumn = Math.floor(col / BLOCK_SIZE) * BLOCK_SIZE;
-    return getBlockArray(sudoku, [topRow, leftColumn]).filter(square => square !== 0);
-}
+
 
 // 4: TWO OUT OF THREE RULE
 // -- look at three rows at a time, check for certain number.  in two rows?  check final block & column
@@ -650,7 +645,7 @@ function findTwoOutOfThreeRule(sudoku) {
                 // if there is only one cell left, we found a Two out of Three Rule!
                 if (columnIndexesMissingValue.size == 1) {
                     let col = columnIndexesMissingValue.values().next().value;
-                    return new SolutionStep('2o3', row, col, value, null, `According to the Two Out Of Three Rule, the value in (${row+1}, ${col+1}) must be ${value} because because the value shows up in the other two columns within this band and there is only one remaining possibility within this block`);
+                    return new SolutionStep('2o3', row, col, value, sudoku, `According to the Two Out Of Three Rule, the value in (${row+1}, ${col+1}) must be ${value} because because the value shows up in the other two columns within this band and there is only one remaining possibility within this block`);
                 }                
             }
         }
@@ -690,7 +685,7 @@ function findTwoOutOfThreeRule(sudoku) {
                 // if there is only one cell left, we found a Two out of Three Rule!
                 if (rowIndexesMissingValue.size == 1) {
                     let row = rowIndexesMissingValue.values().next().value;
-                    return new SolutionStep('2o3', row, col, value, null, `According to the Two Out Of Three Rule, the value in (${row+1}, ${col+1}) must be ${value} because the value shows up in the other two columns within this stack and there is only one remaining possibility within this block`);
+                    return new SolutionStep('2o3', row, col, value, sudoku, `According to the Two Out Of Three Rule, the value in (${row+1}, ${col+1}) must be ${value} because the value shows up in the other two columns within this stack and there is only one remaining possibility within this block`);
                 }                
             }
         }
@@ -701,7 +696,9 @@ function findTwoOutOfThreeRule(sudoku) {
 // 5: SHARED SUBGROUP RULE
 
 // 6: NAKED TWIN RULE
+function findNakedTwinRule(sudoku, pencilMarks) {
 
+}
 // 7: HIDDEN TWIN RULE
 
 // 8: X WING RULE
@@ -715,9 +712,11 @@ function findTwoOutOfThreeRule(sudoku) {
 // 12: TRIAL AND ERROR RULE
 
 function calculateDifficultyScore(solutionSteps) {
+    if (solutionSteps.length == 0 || solutionSteps[solutionSteps.length - 1].stepCode == 'uns') return false;
+
     let difficultyScore = 0;
     let onlyChoiceRuleHasBeenUsed = false;
-    let singlePossibilityRuleHasBeenUsed = false;
+    let singleCandidateRuleHasBeenUsed = false;
     let twoOutOfThreeRuleHasBeenUsed = false;
 
     for (let stepIndex = 0; stepIndex < solutionSteps.length; stepIndex++) {
@@ -729,11 +728,11 @@ function calculateDifficultyScore(solutionSteps) {
                             TECHNIQUE_COST.ONLY_CHOICE.INITIAL;
                 onlyChoiceRuleHasBeenUsed = true;
                 break;
-            case 'spr':
-                stepScore = singlePossibilityRuleHasBeenUsed ? 
-                            TECHNIQUE_COST.SINGLE_POSSIBILITY.RECURRING :
-                            TECHNIQUE_COST.SINGLE_POSSIBILITY.INITIAL;
-                singlePossibilityRuleHasBeenUsed = true;
+            case 'scr':
+                stepScore = singleCandidateRuleHasBeenUsed ? 
+                            TECHNIQUE_COST.SINGLE_CANDIDATE.RECURRING :
+                            TECHNIQUE_COST.SINGLE_CANDIDATE.INITIAL;
+                singleCandidateRuleHasBeenUsed = true;
                 break;
             case '2o3':
                 stepScore = twoOutOfThreeRuleHasBeenUsed ? 
@@ -751,6 +750,20 @@ function calculateDifficultyScore(solutionSteps) {
 //#endregion
 
 //#region Array helper functions
+
+function getEmptySudokuArray() {
+    return [
+        [0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0]
+    ];
+}
 
 function getRowArrayFromBlockArray(blocks) {
     let rowArray = [];
@@ -805,6 +818,20 @@ function getSudokuStringFromRowArray(rowArray) {
         }
     }
     return sudokuString;
+}
+
+function otherValuesInRow(sudoku, row, col) {
+    return sudoku[row].filter((square, colIndex) => square !== 0 || colIndex !== col);
+}
+
+function otherValuesInColumn(sudoku, row, col) {
+    return getColumnArray(sudoku, col).filter(square => square !== 0);
+}
+
+function otherValuesInBlock(sudoku, row, col) {
+    let topRow = Math.floor(row / BLOCK_SIZE) * BLOCK_SIZE;
+    let leftColumn = Math.floor(col / BLOCK_SIZE) * BLOCK_SIZE;
+    return getBlockArray(sudoku, [topRow, leftColumn]).filter(square => square !== 0);
 }
 
 //#endregion
